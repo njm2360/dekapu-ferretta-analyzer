@@ -38,9 +38,16 @@ public static class ProbabilityCalculator
     {
         activeMask |= BoardLayout.CenterBit;
 
-        int preActive = BitOperations.PopCount(activeMask);
-        Span<int> preReachByCell = stackalloc int[BoardLayout.CellCount];
-        int preReach = AnalyzeBoard(activeMask, BoardLayout.LineMasks, preReachByCell, out int preTriggers);
+        int preReach = AnalyzeBoard(activeMask, BoardLayout.LineMasks, out int preTriggers);
+
+        // Precompute which lines are already complete in the pre-state.
+        // Bit i is set iff lineMasks[i] is fully active in activeMask.
+        // These lines can never produce "newly completed" outcomes regardless of N/picks.
+        var lineMasks = BoardLayout.LineMasks;
+        ushort preCompleteBits = 0;
+        for (int i = 0; i < lineMasks.Length; i++)
+            if ((activeMask & lineMasks[i]) == lineMasks[i])
+                preCompleteBits |= (ushort)(1 << i);
 
         var counts = new long[ShotResult.MaxLines + 1];
         long deltaActiveSum = 0;
@@ -52,12 +59,12 @@ public static class ProbabilityCalculator
 
         if (k == 0)
         {
-            CalculateDeterministic(activeMask, shot, preActive, preReach, preTriggers,
+            CalculateDeterministic(activeMask, shot, preReach, preTriggers, preCompleteBits,
                 counts, ref deltaActiveSum, ref deltaReachSum, ref triggerCellsSum, ref resetCellsSum);
         }
         else
         {
-            CalculateRandom(activeMask, k, preActive, preReach, preTriggers,
+            CalculateRandom(activeMask, k, preReach, preTriggers, preCompleteBits,
                 counts, ref deltaActiveSum, ref deltaReachSum, ref triggerCellsSum, ref resetCellsSum);
         }
 
@@ -75,12 +82,11 @@ public static class ProbabilityCalculator
     }
 
     private static void CalculateDeterministic(
-        uint activeMask, ShotType shot, int preActive, int preReach, int preTriggers,
+        uint activeMask, ShotType shot, int preReach, int preTriggers, ushort preCompleteBits,
         long[] counts, ref long deltaActiveSum, ref long deltaReachSum,
         ref long triggerCellsSum, ref long resetCellsSum)
     {
         var lineMasks = BoardLayout.LineMasks;
-        Span<int> reachByCell = stackalloc int[BoardLayout.CellCount];
 
         for (int n = 1; n <= BoardLayout.CellCount; n++)
         {
@@ -93,14 +99,14 @@ public static class ProbabilityCalculator
             }
 
             uint addMask = nBit | ShotEffects.GetDeterministicAddMask(shot, n);
-            ProcessOutcome(activeMask, addMask, lineMasks, preActive, preReach,
-                reachByCell, counts,
+            ProcessOutcome(activeMask, addMask, lineMasks, preReach, preCompleteBits,
+                counts,
                 ref deltaActiveSum, ref deltaReachSum, ref triggerCellsSum, ref resetCellsSum);
         }
     }
 
     private static void CalculateRandom(
-        uint activeMask, int k, int preActive, int preReach, int preTriggers,
+        uint activeMask, int k, int preReach, int preTriggers, ushort preCompleteBits,
         long[] counts, ref long deltaActiveSum, ref long deltaReachSum,
         ref long triggerCellsSum, ref long resetCellsSum)
     {
@@ -126,7 +132,6 @@ public static class ProbabilityCalculator
                 return;
             }
 
-            Span<int> reachByCell = stackalloc int[BoardLayout.CellCount];
             var indices = new int[k];
             for (int i = 0; i < k; i++) indices[i] = i;
 
@@ -135,8 +140,8 @@ public static class ProbabilityCalculator
                 uint addMask = nBit;
                 for (int i = 0; i < k; i++) addMask |= candidateBits[indices[i]];
 
-                ProcessOutcome(activeMask, addMask, lineMasks, preActive, preReach,
-                    reachByCell, acc.Counts,
+                ProcessOutcome(activeMask, addMask, lineMasks, preReach, preCompleteBits,
+                    acc.Counts,
                     ref acc.DeltaActiveSum, ref acc.DeltaReachSum,
                     ref acc.TriggerCellsSum, ref acc.ResetCellsSum);
 
@@ -167,8 +172,8 @@ public static class ProbabilityCalculator
     /// </summary>
     private static void ProcessOutcome(
         uint activeMask, uint addMask, uint[] lineMasks,
-        int preActive, int preReach,
-        Span<int> reachByCell, long[] counts,
+        int preReach, ushort preCompleteBits,
+        long[] counts,
         ref long deltaActiveSum, ref long deltaReachSum,
         ref long triggerCellsSum, ref long resetCellsSum)
     {
@@ -176,10 +181,12 @@ public static class ProbabilityCalculator
 
         uint resetMask = 0;
         int newLines = 0;
+        // Skip lines already complete in pre-state — they cannot be "newly" completed.
         for (int i = 0; i < lineMasks.Length; i++)
         {
+            if ((preCompleteBits & (1 << i)) != 0) continue;
             uint lm = lineMasks[i];
-            if ((newMask & lm) == lm && (activeMask & lm) != lm)
+            if ((newMask & lm) == lm)
             {
                 newLines++;
                 resetMask |= lm;
@@ -189,20 +196,29 @@ public static class ProbabilityCalculator
         counts[newLines]++;
 
         uint postMask = (newMask & ~resetMask) | BoardLayout.CenterBit;
-        int postActive = BitOperations.PopCount(postMask);
-        int postReach = AnalyzeBoard(postMask, lineMasks, reachByCell, out int postTriggers);
+        int postReach = AnalyzeBoard(postMask, lineMasks, out int postTriggers);
+
+        // delta = (cells newly added) - (cells removed by reset, excluding the always-active center)
+        int newCells = BitOperations.PopCount(addMask & ~activeMask);
         int resetCells = BitOperations.PopCount(resetMask & ~BoardLayout.CenterBit);
 
-        deltaActiveSum += postActive - preActive;
+        deltaActiveSum += newCells - resetCells;
         deltaReachSum += postReach - preReach;
         triggerCellsSum += postTriggers;
         resetCellsSum += resetCells;
     }
 
-    private static int AnalyzeBoard(uint mask, uint[] lineMasks, Span<int> reachByCell, out int triggerCells)
+    /// <summary>
+    /// For a given board state: count reach-lines (exactly 4 of 5 cells active)
+    /// and count cells that are the missing cell of 2+ reach-lines (multi-line trigger candidates).
+    /// Uses two bitmasks (reachOnce / reachMulti) instead of a per-cell counter array.
+    /// </summary>
+    private static int AnalyzeBoard(uint mask, uint[] lineMasks, out int triggerCells)
     {
-        reachByCell.Clear();
         int reachCount = 0;
+        uint reachOnce = 0;   // cells that are missing in exactly 1 reach line
+        uint reachMulti = 0;  // cells that are missing in 2+ reach lines
+
         for (int i = 0; i < lineMasks.Length; i++)
         {
             uint lm = lineMasks[i];
@@ -210,15 +226,20 @@ public static class ProbabilityCalculator
             if (BitOperations.PopCount(inLine) == 4)
             {
                 reachCount++;
-                uint missing = lm & ~inLine;
-                int idx = BitOperations.TrailingZeroCount(missing);
-                reachByCell[idx]++;
+                uint missing = lm & ~inLine; // exactly one bit
+                if ((reachOnce & missing) != 0)
+                {
+                    reachOnce ^= missing;       // demote: was 1, now 2+
+                    reachMulti |= missing;
+                }
+                else if ((reachMulti & missing) == 0)
+                {
+                    reachOnce |= missing;       // first reach line through this cell
+                }
+                // else: already 2+, stays in multi
             }
         }
-        int triggers = 0;
-        for (int i = 0; i < BoardLayout.CellCount; i++)
-            if (reachByCell[i] >= 2) triggers++;
-        triggerCells = triggers;
+        triggerCells = BitOperations.PopCount(reachMulti);
         return reachCount;
     }
 
