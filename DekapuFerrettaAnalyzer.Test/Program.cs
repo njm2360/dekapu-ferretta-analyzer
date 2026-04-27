@@ -1,8 +1,8 @@
 using System.Numerics;
-using DekapuFeletta.Models;
-using DekapuFeletta.Services;
+using DekapuFerrettaAnalyzer.Models;
+using DekapuFerrettaAnalyzer.Services;
 
-namespace DekapuFeletta.Test;
+namespace DekapuFerrettaAnalyzer.Test;
 
 internal static class Program
 {

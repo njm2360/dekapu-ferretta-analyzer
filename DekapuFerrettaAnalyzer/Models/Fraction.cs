@@ -1,6 +1,6 @@
 using System.Numerics;
 
-namespace DekapuFeletta.Models;
+namespace DekapuFerrettaAnalyzer.Models;
 
 public readonly struct Fraction : IEquatable<Fraction>, IComparable<Fraction>
 {

@@ -1,4 +1,4 @@
-namespace DekapuFeletta.Models;
+namespace DekapuFerrettaAnalyzer.Models;
 
 public static class BoardLayout
 {

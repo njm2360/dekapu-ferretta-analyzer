@@ -1,7 +1,7 @@
 using CommunityToolkit.Mvvm.ComponentModel;
-using DekapuFeletta.Models;
+using DekapuFerrettaAnalyzer.Models;
 
-namespace DekapuFeletta.ViewModels;
+namespace DekapuFerrettaAnalyzer.ViewModels;
 
 public partial class ShotResultViewModel : ObservableObject
 {

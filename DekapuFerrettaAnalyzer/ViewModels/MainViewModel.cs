@@ -2,10 +2,10 @@ using System.Collections.ObjectModel;
 using System.Diagnostics;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
-using DekapuFeletta.Models;
-using DekapuFeletta.Services;
+using DekapuFerrettaAnalyzer.Models;
+using DekapuFerrettaAnalyzer.Services;
 
-namespace DekapuFeletta.ViewModels;
+namespace DekapuFerrettaAnalyzer.ViewModels;
 
 public partial class MainViewModel : ObservableObject
 {

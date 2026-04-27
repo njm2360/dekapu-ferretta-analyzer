@@ -5,9 +5,9 @@
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <UseWPF>true</UseWPF>
-    <RootNamespace>DekapuFeletta.Test</RootNamespace>
+    <RootNamespace>DekapuFerrettaAnalyzer.Test</RootNamespace>
   </PropertyGroup>
   <ItemGroup>
-    <ProjectReference Include="..\DekapuFeletta\DekapuFeletta.csproj"/>
+    <ProjectReference Include="..\DekapuFerrettaAnalyzer\DekapuFerrettaAnalyzer.csproj"/>
   </ItemGroup>
 </Project>

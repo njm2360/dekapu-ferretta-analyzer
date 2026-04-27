@@ -1,7 +1,7 @@
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 
-namespace DekapuFeletta.ViewModels;
+namespace DekapuFerrettaAnalyzer.ViewModels;
 
 public partial class BoardCellViewModel : ObservableObject
 {

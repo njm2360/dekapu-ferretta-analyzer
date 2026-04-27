@@ -1,7 +1,7 @@
 using System.Numerics;
-using DekapuFeletta.Models;
+using DekapuFerrettaAnalyzer.Models;
 
-namespace DekapuFeletta.Services;
+namespace DekapuFerrettaAnalyzer.Services;
 
 public static class ProbabilityCalculator
 {

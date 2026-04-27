@@ -1,6 +1,6 @@
 using System.Windows;
 
-namespace DekapuFeletta;
+namespace DekapuFerrettaAnalyzer;
 
 public partial class MainWindow : Window
 {
