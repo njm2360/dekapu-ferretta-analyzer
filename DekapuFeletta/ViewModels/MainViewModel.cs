@@ -1,0 +1,202 @@
+using System.Collections.ObjectModel;
+using System.Diagnostics;
+using CommunityToolkit.Mvvm.ComponentModel;
+using CommunityToolkit.Mvvm.Input;
+using DekapuFeletta.Models;
+using DekapuFeletta.Services;
+
+namespace DekapuFeletta.ViewModels;
+
+public partial class MainViewModel : ObservableObject
+{
+    private static readonly ShotType[] AllShots =
+    {
+        ShotType.None,
+        ShotType.Vertical,
+        ShotType.Horizontal,
+        ShotType.Cross,
+        ShotType.Random1,
+        ShotType.Random2,
+        ShotType.Random4,
+        ShotType.VerticalLine,
+        ShotType.HorizontalLine,
+        ShotType.Giant,
+        ShotType.Random8,
+    };
+
+    public ObservableCollection<BoardCellViewModel> Cells { get; } = new();
+    public ObservableCollection<ShotResultViewModel> Results { get; } = new();
+
+    [ObservableProperty]
+    private string _activeCountText = "";
+
+    [ObservableProperty]
+    private bool _isDirty = true;
+
+    [ObservableProperty]
+    private bool _isCalculating;
+
+    [ObservableProperty]
+    private bool _isAutoCalculate;
+
+    [ObservableProperty]
+    private string _statusText = "「計算実行」を押してください";
+
+    [ObservableProperty]
+    private string _lastElapsedText = "";
+
+    public MainViewModel()
+    {
+        for (int row = 0; row < BoardLayout.Size; row++)
+        {
+            for (int col = 0; col < BoardLayout.Size; col++)
+            {
+                int number = BoardLayout.NumberAt(row, col);
+                bool isCenter = number == BoardLayout.CenterNumber;
+                Cells.Add(new BoardCellViewModel(number, isCenter, isCenter, MarkDirty));
+            }
+        }
+
+        foreach (var shot in AllShots)
+            Results.Add(new ShotResultViewModel(shot));
+
+        UpdateActiveCountText();
+    }
+
+    private void MarkDirty()
+    {
+        IsDirty = true;
+        UpdateActiveCountText();
+        if (IsAutoCalculate)
+        {
+            if (!IsCalculating)
+                _ = CalculateAsync();
+        }
+        else
+        {
+            StatusText = "盤面が変更されました — 「計算実行」を押してください";
+        }
+    }
+
+    partial void OnIsAutoCalculateChanged(bool value)
+    {
+        if (value && IsDirty && !IsCalculating)
+            _ = CalculateAsync();
+        else if (!value && !IsDirty)
+            StatusText = "計算完了 (手動モード)";
+        else if (!value && IsDirty)
+            StatusText = "盤面が変更されました — 「計算実行」を押してください";
+    }
+
+    [RelayCommand]
+    private void ClearAll()
+    {
+        foreach (var c in Cells) c.SetActiveSilently(false);
+        MarkDirty();
+    }
+
+    [RelayCommand]
+    private void FillAll()
+    {
+        foreach (var c in Cells) c.SetActiveSilently(true);
+        MarkDirty();
+    }
+
+    private uint BuildActiveMask()
+    {
+        uint mask = 0;
+        foreach (var cell in Cells)
+            if (cell.IsActive)
+                mask |= BoardLayout.Bit(cell.Number);
+        return mask;
+    }
+
+    private void UpdateActiveCountText()
+    {
+        uint mask = BuildActiveMask() | BoardLayout.CenterBit;
+        int activeCount = System.Numerics.BitOperations.PopCount(mask);
+        ActiveCountText = $"アクティブマス数: {activeCount} / 25";
+        UpdateReachCells(mask);
+    }
+
+    private void UpdateReachCells(uint mask)
+    {
+        var counts = new int[BoardLayout.CellCount];
+        foreach (var lineMask in BoardLayout.LineMasks)
+        {
+            uint inLine = mask & lineMask;
+            if (System.Numerics.BitOperations.PopCount(inLine) == 4)
+            {
+                uint missing = lineMask & ~inLine;
+                int idx = System.Numerics.BitOperations.TrailingZeroCount(missing);
+                counts[idx]++;
+            }
+        }
+        foreach (var cell in Cells)
+            cell.ReachLineCount = counts[cell.Number - 1];
+    }
+
+    [RelayCommand]
+    private async Task CalculateAsync()
+    {
+        if (IsCalculating) return;
+        IsCalculating = true;
+
+        long totalElapsed = 0;
+        do
+        {
+            IsDirty = false;
+            StatusText = "計算中...";
+
+            uint mask = BuildActiveMask() | BoardLayout.CenterBit;
+            var sw = Stopwatch.StartNew();
+
+            var results = await Task.Run(() =>
+            {
+                var arr = new ShotResult[AllShots.Length];
+                for (int i = 0; i < AllShots.Length; i++)
+                {
+                    arr[i] = ProbabilityCalculator.Calculate(mask, AllShots[i]);
+                }
+                return arr;
+            });
+
+            sw.Stop();
+            totalElapsed = sw.ElapsedMilliseconds;
+
+            for (int i = 0; i < Results.Count; i++)
+                Results[i].Apply(results[i]);
+
+            var purchasable = Results.Where(r => r.IsPurchasable).ToList();
+            if (purchasable.Count > 0)
+            {
+                double maxExpected = purchasable.Max(r => r.Expected);
+                double maxConditional = purchasable.Max(r => r.ConditionalExpected);
+                double maxDeltaActive = purchasable.Max(r => r.DeltaActive);
+                double maxDeltaReach = purchasable.Max(r => r.DeltaReach);
+                double maxTrigger = purchasable.Max(r => r.TriggerCells);
+                foreach (var r in purchasable)
+                {
+                    r.IsBestExpected = r.Expected > 0 && r.Expected == maxExpected;
+                    r.IsBestConditional = r.ConditionalExpected > 0 && r.ConditionalExpected == maxConditional;
+                    r.IsBestDeltaActive = r.DeltaActive == maxDeltaActive;
+                    r.IsBestDeltaReach = r.DeltaReach == maxDeltaReach;
+                    r.IsBestTriggerCells = r.TriggerCells > 0 && r.TriggerCells == maxTrigger;
+                }
+            }
+            foreach (var r in Results.Where(r => !r.IsPurchasable))
+            {
+                r.IsBestExpected = false;
+                r.IsBestConditional = false;
+                r.IsBestDeltaActive = false;
+                r.IsBestDeltaReach = false;
+                r.IsBestTriggerCells = false;
+            }
+        }
+        while (IsAutoCalculate && IsDirty);
+
+        IsCalculating = false;
+        LastElapsedText = $"計算時間: {totalElapsed} ms";
+        StatusText = IsAutoCalculate ? "計算完了 (自動モード)" : "計算完了";
+    }
+}
