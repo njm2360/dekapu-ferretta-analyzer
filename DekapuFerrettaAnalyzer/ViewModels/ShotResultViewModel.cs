@@ -43,6 +43,7 @@ public partial class ShotResultViewModel : ObservableObject
         Distribution = new DistributionEntryViewModel[ShotResult.MaxLines];
         for (int i = 0; i < ShotResult.MaxLines; i++)
             Distribution[i] = new DistributionEntryViewModel(i + 1);
+        Reset();
     }
 
     public void Apply(ShotResult result)
@@ -75,6 +76,30 @@ public partial class ShotResultViewModel : ObservableObject
 
         for (int i = 0; i < ShotResult.MaxLines; i++)
             Distribution[i].Apply(result.Distribution[i + 1]);
+    }
+
+    public void Reset()
+    {
+        Expected = 0;
+        ExpectedDisplay = "—";
+        ConditionalExpected = 0;
+        ConditionalExpectedDisplay = "—";
+        DeltaActive = 0;
+        DeltaActiveDisplay = "—";
+        DeltaReach = 0;
+        DeltaReachDisplay = "—";
+        TriggerCells = 0;
+        TriggerCellsDisplay = "—";
+        ResetCells = 0;
+        ResetCellsDisplay = "—";
+
+        IsBestExpected = false;
+        IsBestConditional = false;
+        IsBestDeltaActive = false;
+        IsBestDeltaReach = false;
+        IsBestTriggerCells = false;
+
+        foreach (var d in Distribution) d.Reset();
     }
 
     private static string FormatSigned(double v, string fmt)
@@ -113,5 +138,13 @@ public partial class DistributionEntryViewModel : ObservableObject
         ProbabilityDisplay = Probability == 0 ? "—" : Probability.ToString("P2");
         ProbabilityExact = $"P(L={Lines}) = {value.Numerator} / {value.Denominator}";
         HasMass = value.Numerator.Sign > 0;
+    }
+
+    public void Reset()
+    {
+        Probability = 0;
+        ProbabilityDisplay = "—";
+        ProbabilityExact = "";
+        HasMass = false;
     }
 }

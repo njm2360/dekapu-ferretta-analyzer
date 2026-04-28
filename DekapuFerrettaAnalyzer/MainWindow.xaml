@@ -72,6 +72,11 @@
                     <Setter Property="Foreground" Value="#FFFFFF"/>
                     <Setter Property="Cursor" Value="Arrow"/>
                 </DataTrigger>
+                <DataTrigger Binding="{Binding IsOnCompletedLine}" Value="True">
+                    <Setter Property="Background" Value="#5C2020"/>
+                    <Setter Property="BorderBrush" Value="#FF5252"/>
+                    <Setter Property="Foreground" Value="#FFFFFF"/>
+                </DataTrigger>
             </Style.Triggers>
         </Style>
 
@@ -290,13 +295,31 @@
         <Grid Grid.Column="1" Margin="20,0,0,0">
             <Grid.RowDefinitions>
                 <RowDefinition Height="Auto"/>
+                <RowDefinition Height="Auto"/>
                 <RowDefinition Height="*"/>
             </Grid.RowDefinitions>
 
             <TextBlock Grid.Row="0" Text="計算結果" FontSize="18" FontWeight="Bold"
                        Foreground="#E6E6E6" Margin="0,0,0,8"/>
 
-            <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Auto">
+            <Border Grid.Row="1" Background="#5C2020" CornerRadius="4"
+                    Padding="12,8" Margin="0,0,0,8">
+                <Border.Style>
+                    <Style TargetType="Border">
+                        <Setter Property="Visibility" Value="Collapsed"/>
+                        <Style.Triggers>
+                            <DataTrigger Binding="{Binding HasCompletedLine}" Value="True">
+                                <Setter Property="Visibility" Value="Visible"/>
+                            </DataTrigger>
+                        </Style.Triggers>
+                    </Style>
+                </Border.Style>
+                <TextBlock Text="{Binding CompletedLineMessage}"
+                           Foreground="#FFE0E0" FontSize="13" FontWeight="Bold"
+                           TextWrapping="Wrap"/>
+            </Border>
+
+            <ScrollViewer Grid.Row="2" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Auto">
                 <ItemsControl ItemsSource="{Binding Results}">
                     <ItemsControl.ItemTemplate>
                         <DataTemplate>

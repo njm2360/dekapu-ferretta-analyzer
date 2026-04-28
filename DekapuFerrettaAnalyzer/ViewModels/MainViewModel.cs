@@ -45,6 +45,12 @@ public partial class MainViewModel : ObservableObject
     [ObservableProperty]
     private string _lastElapsedText = "";
 
+    [ObservableProperty]
+    private bool _hasCompletedLine;
+
+    [ObservableProperty]
+    private string _completedLineMessage = "";
+
     public MainViewModel()
     {
         for (int row = 0; row < BoardLayout.Size; row++)
@@ -88,6 +94,22 @@ public partial class MainViewModel : ObservableObject
             StatusText = "盤面が変更されました — 「計算実行」を押してください";
     }
 
+    partial void OnHasCompletedLineChanged(bool value)
+    {
+        if (value)
+        {
+            // ライン成立中は計算結果を保持しない
+            foreach (var r in Results) r.Reset();
+            StatusText = "ラインが既に成立しています";
+            LastElapsedText = "";
+        }
+        else if (!IsCalculating)
+        {
+            // 解除されたら自動で再計算
+            _ = CalculateAsync();
+        }
+    }
+
     [RelayCommand]
     private void ClearAll()
     {
@@ -116,24 +138,44 @@ public partial class MainViewModel : ObservableObject
         uint mask = BuildActiveMask() | BoardLayout.CenterBit;
         int activeCount = System.Numerics.BitOperations.PopCount(mask);
         ActiveCountText = $"アクティブマス数: {activeCount} / 25";
-        UpdateReachCells(mask);
+        UpdateBoardAnalysis(mask);
     }
 
-    private void UpdateReachCells(uint mask)
+    private void UpdateBoardAnalysis(uint mask)
     {
-        var counts = new int[BoardLayout.CellCount];
-        foreach (var lineMask in BoardLayout.LineMasks)
+        var reachCounts = new int[BoardLayout.CellCount];
+        uint completedCellsMask = 0;
+        bool anyCompleted = false;
+        var lineMasks = BoardLayout.LineMasks;
+
+        for (int i = 0; i < lineMasks.Length; i++)
         {
+            uint lineMask = lineMasks[i];
             uint inLine = mask & lineMask;
-            if (System.Numerics.BitOperations.PopCount(inLine) == 4)
+            int popCount = System.Numerics.BitOperations.PopCount(inLine);
+            if (popCount == 5)
+            {
+                completedCellsMask |= lineMask;
+                anyCompleted = true;
+            }
+            else if (popCount == 4)
             {
                 uint missing = lineMask & ~inLine;
                 int idx = System.Numerics.BitOperations.TrailingZeroCount(missing);
-                counts[idx]++;
+                reachCounts[idx]++;
             }
         }
+
         foreach (var cell in Cells)
-            cell.ReachLineCount = counts[cell.Number - 1];
+        {
+            cell.ReachLineCount = reachCounts[cell.Number - 1];
+            cell.IsOnCompletedLine = (completedCellsMask & (1u << (cell.Number - 1))) != 0;
+        }
+
+        HasCompletedLine = anyCompleted;
+        CompletedLineMessage = anyCompleted
+            ? "⚠ ラインが既に成立しています — 該当マスを解除してください"
+            : "";
     }
 
     [RelayCommand]
@@ -146,6 +188,15 @@ public partial class MainViewModel : ObservableObject
         do
         {
             IsDirty = false;
+
+            if (HasCompletedLine)
+            {
+                StatusText = "計算スキップ — 成立済みラインを解除してください";
+                LastElapsedText = "";
+                IsCalculating = false;
+                return;
+            }
+
             StatusText = "計算中...";
 
             uint mask = BuildActiveMask() | BoardLayout.CenterBit;
