@@ -10,22 +10,24 @@ namespace DekapuFerrettaAnalyzer.ViewModels;
 public partial class MainViewModel : ObservableObject
 {
     private static readonly ShotType[] AllShots =
-    {
+    [
         ShotType.None,
+        ShotType.Random1,
+        ShotType.Random2,
         ShotType.Vertical,
         ShotType.Horizontal,
         ShotType.Cross,
-        ShotType.Random1,
-        ShotType.Random2,
         ShotType.Random4,
         ShotType.VerticalLine,
         ShotType.HorizontalLine,
         ShotType.Giant,
         ShotType.Random8,
-    };
+    ];
 
     public ObservableCollection<BoardCellViewModel> Cells { get; } = new();
     public ObservableCollection<ShotResultViewModel> Results { get; } = new();
+    public ObservableCollection<LineGeometry> CompletedLineGeometries { get; } = new();
+    public ObservableCollection<LineGeometry> ReachLineGeometries { get; } = new();
 
     [ObservableProperty]
     private string _activeCountText = "";
@@ -37,7 +39,7 @@ public partial class MainViewModel : ObservableObject
     private bool _isCalculating;
 
     [ObservableProperty]
-    private bool _isAutoCalculate;
+    private bool _isAutoCalculate = true;
 
     [ObservableProperty]
     private string _statusText = "「計算実行」を押してください";
@@ -67,6 +69,9 @@ public partial class MainViewModel : ObservableObject
             Results.Add(new ShotResultViewModel(shot));
 
         UpdateActiveCountText();
+
+        if (IsAutoCalculate && !HasCompletedLine)
+            _ = CalculateAsync();
     }
 
     private void MarkDirty()
@@ -144,9 +149,11 @@ public partial class MainViewModel : ObservableObject
     private void UpdateBoardAnalysis(uint mask)
     {
         var reachCounts = new int[BoardLayout.CellCount];
-        uint completedCellsMask = 0;
         bool anyCompleted = false;
         var lineMasks = BoardLayout.LineMasks;
+
+        CompletedLineGeometries.Clear();
+        ReachLineGeometries.Clear();
 
         for (int i = 0; i < lineMasks.Length; i++)
         {
@@ -155,27 +162,47 @@ public partial class MainViewModel : ObservableObject
             int popCount = System.Numerics.BitOperations.PopCount(inLine);
             if (popCount == 5)
             {
-                completedCellsMask |= lineMask;
                 anyCompleted = true;
+                CompletedLineGeometries.Add(GetLineGeometry(i));
             }
             else if (popCount == 4)
             {
                 uint missing = lineMask & ~inLine;
                 int idx = System.Numerics.BitOperations.TrailingZeroCount(missing);
                 reachCounts[idx]++;
+                ReachLineGeometries.Add(GetLineGeometry(i));
             }
         }
 
         foreach (var cell in Cells)
-        {
             cell.ReachLineCount = reachCounts[cell.Number - 1];
-            cell.IsOnCompletedLine = (completedCellsMask & (1u << (cell.Number - 1))) != 0;
-        }
 
         HasCompletedLine = anyCompleted;
         CompletedLineMessage = anyCompleted
             ? "⚠ ラインが既に成立しています — 該当マスを解除してください"
             : "";
+    }
+
+    private static LineGeometry GetLineGeometry(int lineIndex)
+    {
+        const double Cell = 68;
+        const double Half = 34;
+        const double Start = 15;
+        const double End = 5 * Cell - 15; // = 325
+
+        if (lineIndex < 5)
+        {
+            double y = lineIndex * Cell + Half;
+            return new LineGeometry(Start, y, End, y);
+        }
+        if (lineIndex < 10)
+        {
+            double x = (lineIndex - 5) * Cell + Half;
+            return new LineGeometry(x, Start, x, End);
+        }
+        if (lineIndex == 10)
+            return new LineGeometry(Start, Start, End, End);
+        return new LineGeometry(End, Start, Start, End);
     }
 
     [RelayCommand]

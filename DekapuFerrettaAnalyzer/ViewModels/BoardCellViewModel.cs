@@ -17,9 +17,6 @@ public partial class BoardCellViewModel : ObservableObject
     [NotifyPropertyChangedFor(nameof(ReachBadge))]
     private int _reachLineCount;
 
-    [ObservableProperty]
-    private bool _isOnCompletedLine;
-
     public bool IsReach => ReachLineCount >= 1;
     public bool IsMultiTrigger => ReachLineCount >= 2;
     public string ReachBadge => ReachLineCount >= 2 ? ReachLineCount.ToString() : "";

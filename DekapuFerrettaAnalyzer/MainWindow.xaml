@@ -15,8 +15,9 @@
     <Window.Resources>
         <Style x:Key="CellButton" TargetType="Button">
             <Setter Property="Margin" Value="3"/>
-            <Setter Property="FontSize" Value="22"/>
-            <Setter Property="FontWeight" Value="Bold"/>
+            <Setter Property="FontFamily" Value="Segoe UI Light, Segoe UI"/>
+            <Setter Property="FontSize" Value="42"/>
+            <Setter Property="FontWeight" Value="Light"/>
             <Setter Property="Foreground" Value="#E6E6E6"/>
             <Setter Property="BorderThickness" Value="2"/>
             <Setter Property="BorderBrush" Value="#404452"/>
@@ -42,40 +43,23 @@
             </Setter>
             <Style.Triggers>
                 <DataTrigger Binding="{Binding IsActive}" Value="True">
-                    <Setter Property="Background" Value="#2D5A2D"/>
-                    <Setter Property="BorderBrush" Value="#5FCB5F"/>
+                    <Setter Property="Background" Value="#2A2D34"/>
                 </DataTrigger>
                 <DataTrigger Binding="{Binding IsActive}" Value="False">
-                    <Setter Property="Background" Value="#2A2D34"/>
+                    <Setter Property="Background" Value="#2D5A2D"/>
+                    <Setter Property="BorderBrush" Value="#5FCB5F"/>
                 </DataTrigger>
                 <MultiDataTrigger>
                     <MultiDataTrigger.Conditions>
                         <Condition Binding="{Binding IsActive}" Value="False"/>
                         <Condition Binding="{Binding IsReach}" Value="True"/>
                     </MultiDataTrigger.Conditions>
-                    <Setter Property="Background" Value="#3A2D1A"/>
-                    <Setter Property="BorderBrush" Value="#FF9F70"/>
-                    <Setter Property="Foreground" Value="#FFD8B8"/>
-                </MultiDataTrigger>
-                <MultiDataTrigger>
-                    <MultiDataTrigger.Conditions>
-                        <Condition Binding="{Binding IsActive}" Value="False"/>
-                        <Condition Binding="{Binding IsMultiTrigger}" Value="True"/>
-                    </MultiDataTrigger.Conditions>
-                    <Setter Property="Background" Value="#3D1F3F"/>
-                    <Setter Property="BorderBrush" Value="#E879F9"/>
-                    <Setter Property="Foreground" Value="#F5C6FF"/>
+                    <Setter Property="Background" Value="#3A1818"/>
+                    <Setter Property="BorderBrush" Value="#FF6B6B"/>
+                    <Setter Property="Foreground" Value="#FFD8D8"/>
                 </MultiDataTrigger>
                 <DataTrigger Binding="{Binding IsCenter}" Value="True">
-                    <Setter Property="Background" Value="#7A5C00"/>
-                    <Setter Property="BorderBrush" Value="#E6B800"/>
-                    <Setter Property="Foreground" Value="#FFFFFF"/>
                     <Setter Property="Cursor" Value="Arrow"/>
-                </DataTrigger>
-                <DataTrigger Binding="{Binding IsOnCompletedLine}" Value="True">
-                    <Setter Property="Background" Value="#5C2020"/>
-                    <Setter Property="BorderBrush" Value="#FF5252"/>
-                    <Setter Property="Foreground" Value="#FFFFFF"/>
                 </DataTrigger>
             </Style.Triggers>
         </Style>
@@ -183,6 +167,7 @@
         <StackPanel Grid.Column="0" Width="340">
             <TextBlock Text="盤面入力" FontSize="18" FontWeight="Bold"
                        Foreground="#E6E6E6" Margin="0,0,0,8"/>
+            <Grid Width="340" Height="340">
             <ItemsControl ItemsSource="{Binding Cells}">
                 <ItemsControl.ItemsPanel>
                     <ItemsPanelTemplate>
@@ -197,9 +182,22 @@
                                 HorizontalContentAlignment="Stretch"
                                 VerticalContentAlignment="Stretch">
                             <Grid>
-                                <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
-                                    <TextBlock Text="{Binding Number}" HorizontalAlignment="Center"/>
-                                    <TextBlock Text="★" FontSize="12" HorizontalAlignment="Center"
+                                <Grid HorizontalAlignment="Center" VerticalAlignment="Center">
+                                    <TextBlock Text="{Binding Number}" HorizontalAlignment="Center"
+                                               VerticalAlignment="Center">
+                                        <TextBlock.Style>
+                                            <Style TargetType="TextBlock">
+                                                <Setter Property="Visibility" Value="Visible"/>
+                                                <Style.Triggers>
+                                                    <DataTrigger Binding="{Binding IsCenter}" Value="True">
+                                                        <Setter Property="Visibility" Value="Collapsed"/>
+                                                    </DataTrigger>
+                                                </Style.Triggers>
+                                            </Style>
+                                        </TextBlock.Style>
+                                    </TextBlock>
+                                    <TextBlock Text="★" HorizontalAlignment="Center"
+                                               VerticalAlignment="Center"
                                                Foreground="#FFD86A">
                                         <TextBlock.Style>
                                             <Style TargetType="TextBlock">
@@ -212,10 +210,10 @@
                                             </Style>
                                         </TextBlock.Style>
                                     </TextBlock>
-                                </StackPanel>
+                                </Grid>
                                 <Border HorizontalAlignment="Right" VerticalAlignment="Top"
                                         Margin="0,3,3,0"
-                                        Background="#E879F9" CornerRadius="7"
+                                        Background="#FFFFFF" CornerRadius="7"
                                         MinWidth="14" Height="14"
                                         Padding="3,0">
                                     <Border.Style>
@@ -239,6 +237,45 @@
                     </DataTemplate>
                 </ItemsControl.ItemTemplate>
             </ItemsControl>
+
+            <!-- Reach line overlay -->
+            <ItemsControl ItemsSource="{Binding ReachLineGeometries}"
+                          IsHitTestVisible="False">
+                <ItemsControl.ItemsPanel>
+                    <ItemsPanelTemplate>
+                        <Canvas Width="340" Height="340"/>
+                    </ItemsPanelTemplate>
+                </ItemsControl.ItemsPanel>
+                <ItemsControl.ItemTemplate>
+                    <DataTemplate>
+                        <Line X1="{Binding X1}" Y1="{Binding Y1}"
+                              X2="{Binding X2}" Y2="{Binding Y2}"
+                              Stroke="#FFA040" StrokeThickness="8"
+                              Opacity="0.30"
+                              StrokeStartLineCap="Round" StrokeEndLineCap="Round"/>
+                    </DataTemplate>
+                </ItemsControl.ItemTemplate>
+            </ItemsControl>
+
+            <!-- Completed line overlay -->
+            <ItemsControl ItemsSource="{Binding CompletedLineGeometries}"
+                          IsHitTestVisible="False">
+                <ItemsControl.ItemsPanel>
+                    <ItemsPanelTemplate>
+                        <Canvas Width="340" Height="340"/>
+                    </ItemsPanelTemplate>
+                </ItemsControl.ItemsPanel>
+                <ItemsControl.ItemTemplate>
+                    <DataTemplate>
+                        <Line X1="{Binding X1}" Y1="{Binding Y1}"
+                              X2="{Binding X2}" Y2="{Binding Y2}"
+                              Stroke="#FF00FF" StrokeThickness="10"
+                              Opacity="0.55"
+                              StrokeStartLineCap="Round" StrokeEndLineCap="Round"/>
+                    </DataTemplate>
+                </ItemsControl.ItemTemplate>
+            </ItemsControl>
+            </Grid>
 
             <StackPanel Orientation="Horizontal" Margin="0,12,0,0">
                 <Button Content="全クリア" Command="{Binding ClearAllCommand}"
